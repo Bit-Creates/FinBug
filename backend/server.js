@@ -23,6 +23,11 @@ app.use(express.urlencoded({ extended: true, charset: 'utf-8' }));
 
 connectDB();
 
+// Health check route
+app.get("/", (req, res) => {
+  res.json({ message: "FinBug API is running", status: "ok" });
+});
+
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/income", incomeRoutes);
 app.use("/api/v1/expense", expenseRoutes);
