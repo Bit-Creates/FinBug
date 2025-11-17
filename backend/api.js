@@ -5,97 +5,114 @@ const compression = require('compression');
 
 const app = express();
 
-// Enable gzip compression
+// Middleware
 app.use(compression());
-
-// Simple CORS - allow all origins temporarily
 app.use(cors({
-    origin: '*',
+    origin: process.env.CLIENT_URL || '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 }));
-
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Health check route
-app.get("/", (req, res) => {
-    res.json({ message: "FinBug API is running", status: "ok" });
-});
+// Database connection
+let dbInitialized = false;
+const connectDB = require('./config/db');
 
-app.get("/api", (req, res) => {
-    res.json({ message: "FinBug API is running", status: "ok" });
-});
-
-// Load routes dynamically with error handling
-let authRoutes, incomeRoutes, expenseRoutes, dashboardRoutes, aiRoutes, billScanRoutes, connectDB;
-
-try {
-    connectDB = require('./config/db');
-    // Connect to database (non-blocking)
-    if (connectDB) {
-        connectDB().catch(err => console.error('Database connection error:', err));
+// Initialize database connection
+const initializeDB = async () => {
+    if (!dbInitialized) {
+        try {
+            await connectDB();
+            dbInitialized = true;
+            console.log('✅ Database connected successfully');
+        } catch (error) {
+            console.error('❌ Database connection failed:', error.message);
+            throw error;
+        }
     }
-} catch (error) {
-    console.error('Error loading database config:', error.message);
-}
+};
 
-try {
-    authRoutes = require("./routes/authRoutes");
-    app.use("/api/v1/auth", authRoutes);
-} catch (error) {
-    console.error('Error loading auth routes:', error.message);
-}
-
-try {
-    incomeRoutes = require("./routes/incomeRoutes");
-    app.use("/api/v1/income", incomeRoutes);
-} catch (error) {
-    console.error('Error loading income routes:', error.message);
-}
-
-try {
-    expenseRoutes = require("./routes/expenseRoutes");
-    app.use("/api/v1/expense", expenseRoutes);
-} catch (error) {
-    console.error('Error loading expense routes:', error.message);
-}
-
-try {
-    dashboardRoutes = require("./routes/dashboardRoutes");
-    app.use("/api/v1/dashboard", dashboardRoutes);
-} catch (error) {
-    console.error('Error loading dashboard routes:', error.message);
-}
-
-try {
-    aiRoutes = require("./routes/aiRoutes");
-    app.use("/api/v1/ai", aiRoutes);
-} catch (error) {
-    console.error('Error loading AI routes:', error.message);
-}
-
-try {
-    billScanRoutes = require("./routes/billScanRoutes");
-    app.use("/api/v1/bill", billScanRoutes);
-} catch (error) {
-    console.error('Error loading bill scan routes:', error.message);
-}
-
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({ message: 'Route not found' });
+// Middleware to ensure DB is connected before processing API requests
+app.use(async (req, res, next) => {
+    if (req.path.startsWith('/api/v1') && !dbInitialized) {
+        try {
+            await initializeDB();
+        } catch (error) {
+            return res.status(503).json({
+                message: 'Database connection failed',
+                error: error.message
+            });
+        }
+    }
+    next();
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Error:', err);
-    res.status(500).json({
-        message: 'Internal server error',
-        error: err.message
+// Health check
+app.get("/", (_, res) => {
+    res.json({
+        message: "FinBug API is running",
+        status: "ok",
+        dbConnected: dbInitialized,
+        timestamp: new Date().toISOString()
     });
 });
 
-// Export the Express app for Vercel
+app.get("/api", (_, res) => {
+    res.json({
+        message: "FinBug API is running",
+        status: "ok",
+        dbConnected: dbInitialized,
+        timestamp: new Date().toISOString()
+    });
+});
+
+// Load routes
+try {
+    const authRoutes = require("./routes/authRoutes");
+    const incomeRoutes = require("./routes/incomeRoutes");
+    const expenseRoutes = require("./routes/expenseRoutes");
+    const dashboardRoutes = require("./routes/dashboardRoutes");
+    const aiRoutes = require("./routes/aiRoutes");
+    const billScanRoutes = require("./routes/billScanRoutes");
+
+    app.use("/api/v1/auth", authRoutes);
+    app.use("/api/v1/income", incomeRoutes);
+    app.use("/api/v1/expense", expenseRoutes);
+    app.use("/api/v1/dashboard", dashboardRoutes);
+    app.use("/api/v1/ai", aiRoutes);
+    app.use("/api/v1/bill", billScanRoutes);
+
+    console.log('✅ All routes loaded successfully');
+} catch (error) {
+    console.error('❌ Error loading routes:', error.message);
+}
+
+// 404 handler
+app.use((_, res) => {
+    res.status(404).json({
+        message: 'Route not found',
+        availableRoutes: [
+            '/api/v1/auth/login',
+            '/api/v1/auth/register',
+            '/api/v1/income',
+            '/api/v1/expense',
+            '/api/v1/dashboard',
+            '/api/v1/ai',
+            '/api/v1/bill'
+        ]
+    });
+});
+
+// Global error handler
+app.use((err, _, res, __) => {
+    console.error('❌ Error:', err);
+    res.status(err.status || 500).json({
+        message: err.message || 'Internal server error',
+        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    });
+});
+
+// Export for Vercel
 module.exports = app;
