@@ -43,8 +43,8 @@ app.use(cors({
 app.use(express.json({ limit: '10mb', charset: 'utf-8' }));
 app.use(express.urlencoded({ extended: true, charset: 'utf-8' }));
 
-// Connect to database
-connectDB();
+// Connect to database (non-blocking)
+connectDB().catch(err => console.error('Database connection error:', err));
 
 // Health check route
 app.get("/", (req, res) => {
@@ -64,6 +64,15 @@ app.use("/api/v1/bill", billScanRoutes);
 
 // Server uploads folder
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error('Error:', err);
+    res.status(500).json({
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+});
 
 // Export the Express app for Vercel
 module.exports = app;
