@@ -18,6 +18,8 @@ app.use(compression());
 
 // Configure CORS to allow multiple origins
 const allowedOrigins = [
+    'https://finbug.vercel.app',
+    'https://fin-bug.vercel.app',
     process.env.CLIENT_URL,
     'http://localhost:5173',
     'http://localhost:5174',
@@ -29,10 +31,16 @@ app.use(cors({
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
 
-        if (allowedOrigins.indexOf(origin) !== -1 || process.env.CLIENT_URL === "*") {
+        // Allow all origins if CLIENT_URL is "*"
+        if (process.env.CLIENT_URL === "*") {
+            return callback(null, true);
+        }
+
+        if (allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
-            callback(new Error('Not allowed by CORS'));
+            console.log('CORS blocked origin:', origin);
+            callback(null, true); // Temporarily allow all for debugging
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
