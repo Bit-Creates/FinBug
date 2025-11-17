@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const path = require('path');
 const connectDB = require('../config/db');
 const authRoutes = require("../routes/authRoutes");
@@ -12,10 +13,14 @@ const billScanRoutes = require("../routes/billScanRoutes");
 
 const app = express();
 
+// Enable gzip compression for faster response times
+app.use(compression());
+
 app.use(cors({
     origin: process.env.CLIENT_URL || "*",
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
 }));
 
 app.use(express.json({ limit: '10mb', charset: 'utf-8' }));
