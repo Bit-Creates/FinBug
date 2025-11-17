@@ -63,15 +63,25 @@ app.get("/api", (req, res) => {
     res.json({ message: "FinBug API is running", status: "ok" });
 });
 
-app.use("/api/v1/auth", authRoutes);
-app.use("/api/v1/income", incomeRoutes);
-app.use("/api/v1/expense", expenseRoutes);
-app.use("/api/v1/dashboard", dashboardRoutes);
-app.use("/api/v1/ai", aiRoutes);
-app.use("/api/v1/bill", billScanRoutes);
+// Wrap route mounting in try-catch to identify which route causes issues
+try {
+    app.use("/api/v1/auth", authRoutes);
+    app.use("/api/v1/income", incomeRoutes);
+    app.use("/api/v1/expense", expenseRoutes);
+    app.use("/api/v1/dashboard", dashboardRoutes);
+    app.use("/api/v1/ai", aiRoutes);
+    app.use("/api/v1/bill", billScanRoutes);
+} catch (error) {
+    console.error('Error mounting routes:', error);
+}
 
 // Server uploads folder
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+// 404 handler for unmatched routes
+app.use((req, res, next) => {
+    res.status(404).json({ message: 'Route not found' });
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
